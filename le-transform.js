@@ -236,4 +236,31 @@ invert() {
     // `matrix()`
     return `matrix(${this.matrix.toString()})`
   }
+// 从 range 变到 domain
+// 需要多少 offset , 和 多少 scale
+// 很玄乎对吧 ,就是 k / b
+  static getTransform(range, domain) {
+    var x1 = range[0]
+    var x2 = range[1]
+    var y1 = domain[0]
+    var y2 = domain[1]
+    // 求 r1 在 x1,x2 什么位置
+    var k = (y2 - y1) / (x2 - x1)
+    var b = (y1 * x2 - y2 * x1) / (x2 - x1)
+    return {
+      scale: k,
+      translate: b,
+    }
+  }
+
+  // 两个 rect 之间怎么 transform
+  // 这样我们就可以进行灵活的变化了
+  static getTransformRect(rect, targetRect) {
+    var xTrans = LeTransform.getTransform([rect.left,rect.right],[targetRect.left,targetRect.left])
+    var yTrans = LeTransform.getTransform([rect.top,rect.bottom],[targetRect.top,targetRect.bottom])
+    return {
+      scale:[xTrans.scale,yTrans.scale]
+      translate:[xTrans.translate,yTrans.translate]
+    }
+  }
 }
