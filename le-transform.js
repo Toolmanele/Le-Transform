@@ -2,30 +2,47 @@ var ARRAY_TYPE = typeof Float32Array !== 'undefined' ? Float32Array : Array
 class LeTransform {
   constructor(el) {
     let _el
-    if (el instanceof String) {
-      if (/^matrix\([\d,]+?\)$/.test(el)) {
+    if (typeof el === 'string') {
+      console.log(/^matrix\([\d,]+\)$/.test(el))
+      if (/matrix\([\d,]+\)/.test(el)) {
         this.matrix = this.parse(el)
       } else {
         _el = document.querySelector(el)
       }
     } else if (el instanceof Element) {
       _el = el
+    } else if (el instanceof ARRAY_TYPE) {
+      this.matrix = this.createMatrix()
+      for (let i = 0; i < el.length; i++) {
+        this.matrix[i] = el[i]
+      }
+    } else if (el instanceof LeTransform) {
+      this.matrix = el._copy()
     }
-
     if (_el) {
       this.matrix = this.parseEl(_el)
     }
+
     if (!this.matrix) {
       console.log('输入不合法')
     }
-    this.transform = this.matrix2transform()
   }
 
-  transform2Matrix() {
-    // let t = this.transform
-    // let m = this.createMatrix()
-    // let t1 = this.createFromTranslate(t.translate[0],t.translate[1])
-    // m = this.multiply(t1)
+  get transform() {
+    return this.matrix2transform()
+  }
+
+  // 复制 leTransform
+  copy() {
+    return new LeTransform(this.matrix)
+  }
+  // 复制 matrix
+  _copy() {
+    let m = this.createMatrix()
+    for (let i = 0; i < this.matrix.length; i++) {
+      m[i] = this.matrix[i]
+    }
+    return m
   }
   matrix2transform() {
     let m = this.matrix
@@ -99,7 +116,32 @@ class LeTransform {
     out[3] = 1
     return out
   }
+invert() {
+    var a = this.matrix
+    var aa = a[0],
+      ab = a[1],
+      ac = a[2],
+      ad = a[3]
+    var atx = a[4],
+      aty = a[5]
+    var det = aa * ad - ab * ac
 
+    if (!det) {
+      return null
+    }
+
+    det = 1.0 / det
+    var out = this.createMatrix()
+    out[0] = ad * det
+    out[1] = -ab * det
+    out[2] = -ac * det
+    out[3] = aa * det
+    out[4] = (ac * aty - ad * atx) * det
+    out[5] = (ab * atx - aa * aty) * det
+
+    this.matrix = out
+    return this
+  }
   multiply(a) {
     var b = this.matrix
     var a0 = a[0],
@@ -114,7 +156,7 @@ class LeTransform {
       b3 = b[3],
       b4 = b[4],
       b5 = b[5]
-    var out = this.create()
+    var out = this.createMatrix()
     out[0] = a0 * b0 + a2 * b1
     out[1] = a1 * b0 + a3 * b1
     out[2] = a0 * b2 + a2 * b3
@@ -124,15 +166,46 @@ class LeTransform {
     this.matrix = out
     return this
   }
-
+  // 针对平移进行优化,因为平移才是大量的操作
+  get trans() {
+    return [this.matrix[4], this.matrix[5]]
+  }
   translate(x, y) {
     return this.multiply(this.createFromTranslate(x, y))
   }
-  scale([x, y]) {
+  scale(x, y) {
     return this.multiply(this.createFromScaling(x, y))
   }
   rotate(deg) {
     return this.multiply(this.createFromRotate(deg))
+  }
+  getXY(x, y) {
+    let m = this.matrix
+    return [m[0] * x + m[2] * y + m[4], m[1] * x + m[3] * y + m[5]]
+  }
+  invert() {
+    let a = this.matrix
+    let m = this.createMatrix()
+    var aa = a[0],
+      ab = a[1],
+      ac = a[2],
+      ad = a[3]
+    var atx = a[4],
+      aty = a[5]
+    var det = aa * ad - ab * ac
+
+    if (!det) {
+      return null
+    }
+
+    det = 1.0 / det
+    m[0] = ad * det
+    m[1] = -ab * det
+    m[2] = -ac * det
+    m[3] = aa * det
+    m[4] = (ac * aty - ad * atx) * det
+    m[5] = (ab * atx - aa * aty) * det
+    return new LeTransform(m)
   }
   createFromRotate(deg) {
     var out = this.createMatrix()
@@ -147,13 +220,13 @@ class LeTransform {
   }
   // 从 translate 创建矩阵
   createFromTranslate(x, y) {
-    var out = this.create()
+    var out = this.createMatrix()
     out[4] = x
     out[5] = y
     return out
   }
   createFromScaling(x, y) {
-    var out = this.create()
+    var out = this.createMatrix()
     out[0] = x
     out[3] = y
     return out
